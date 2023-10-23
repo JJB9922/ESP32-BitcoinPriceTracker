@@ -16,7 +16,7 @@ const char* password = SECRET_PASS;
 
 const String url = "http://api.coindesk.com/v1/bpi/currentprice/GBP";
 const String url2 = "http://api.coindesk.com/v1/bpi/currentprice/BTC.json";
-const String historyURL = "http://api.coindesk.com/v1/bpi/historical/close.json";
+const String url3 = "http://api.coindesk.com/v1/bpi/currentprice/EUR.json";
 const String cryptoCode = "BTC";
 
 const unsigned char bitcoinIcon [] PROGMEM = {
@@ -97,6 +97,22 @@ void loop() {
         return;
       }
 
+    http.begin(url3);
+    int httpCode = http.GET();
+    Serial.print("HTTP Code: ");
+    Serial.println(httpCode);
+
+    if (httpCode > 0) {
+      StaticJsonDocument<768> doc3;
+      DeserializationError error = deserializeJson(doc3, http.getString());
+
+      if (error) {
+        Serial.print(F("deserializeJson failed: "));
+        Serial.println(error.f_str());
+        delay(2500);
+        return;
+      }
+
       Serial.print("HTTP Status Code: ");
       Serial.println(httpCode);
 
@@ -123,22 +139,21 @@ void loop() {
       } else {
         lastPrice = BTCUSDPrice;
       }
+    
+      String BTCEURPrice = doc3["bpi"]["EUR"]["rate_float"].as<String>();
+        if(BTCEURPrice == lastPrice) {
+          Serial.print("Price hasn't changed (Current/Last): ");
+          Serial.print(BTCEURPrice);
+          Serial.print(" : ");
+          Serial.println(lastPrice);
+          delay(1250);
+          return;
+        } else {
+          lastPrice = BTCEURPrice;
+        }
 
       String lastUpdated = doc["time"]["updated"].as<String>();
-      http.end();
 
-      Serial.println("Getting history...");
-      StaticJsonDocument<1536> historyDoc;
-      http.begin(historyURL);
-      int historyHttpCode = http.GET();
-      DeserializationError historyError = deserializeJson(historyDoc, http.getString());
-
-      if (historyError) {
-        Serial.print(F("deserializeJson(History) failed: "));
-        Serial.println(historyError.f_str());
-        delay(2500);
-        return;
-      }
       display.clearDisplay();
       display.drawBitmap((128/2) - (24/2), 0, bitcoinIcon, 24, 24, WHITE);
       display.display();
@@ -149,22 +164,15 @@ void loop() {
       display.setTextSize(1);
       printCenter(BTCUSDPrice + " USD", 0, 40);
 
-      double yesterdayPrice = historyDoc["bpi"]["2021-03-20"].as<double>();
-      bool isUp = BTCGBPPrice.toDouble() > yesterdayPrice;
-      double percentChange;
-      String dayChangeString = "24hr. Change: ";
-      if (isUp) {
-        percentChange = ((BTCGBPPrice.toDouble() - yesterdayPrice) / yesterdayPrice) * 100;
-      } else {
-        percentChange = ((yesterdayPrice - BTCGBPPrice.toDouble()) / yesterdayPrice) * 100;
-        dayChangeString = dayChangeString + "-";
-      }
       display.setTextSize(1);
-      dayChangeString = dayChangeString + percentChange + "%";
-      printCenter(dayChangeString, 0, 55);
+      printCenter(BTCEURPrice + " EUR", 0, 48);
+      
+      display.setTextSize(1);
+      printCenter("1.0000 BTC", 0, 56);
 
       display.display();
       http.end();
+      }
     }
   }
     delay(5000);
